@@ -288,33 +288,40 @@ async function loadDouban(params = {}) {
  * 模块 2：加载精选剧场
  */
 async function loadTheater(params = {}) {
-  const data = await Utils.fetch("theater-data.json");
-  if (data === Utils.emptyTips) return data;
-
-  // 兼容云端数据可能包在 data/result 中的情况。
-  const root = data && (data.data || data.result || data);
-  const aliases = {
-    "迷雾剧场": "迷雾剧场", "迷霧劇場": "迷雾剧场",
-    "白夜剧场": "白夜剧场", "白夜劇場": "白夜剧场",
-    "X剧场": "X剧场", "X 劇場": "X剧场",
-    "玛卡巴卡的悬疑剧": "玛卡巴卡的悬疑剧", "瑪卡的片單": "玛卡巴卡的悬疑剧",
-    "横屏短剧": "横屏短剧", "橫屏短劇": "横屏短剧",
-    "生花剧场": "生花剧场", "生花劇場": "生花剧场",
-    "大家剧场": "大家剧场", "大家劇場": "大家剧场",
-    "小逗剧场": "小逗剧场", "小逗劇場": "小逗剧场",
-    "十分剧场": "十分剧场", "十分劇場": "十分剧场",
-    "板凳单元": "板凳单元", "板凳單元": "板凳单元",
-    "萤火单元": "萤火单元", "螢火單元": "萤火单元",
-    "正午阳光": "正午阳光", "正午陽光": "正午阳光",
-    "恋恋剧场": "恋恋剧场", "戀戀劇場": "恋恋剧场",
-    "悬疑剧场": "悬疑剧场", "懸疑劇場": "悬疑剧场",
-    "微尘剧场": "微尘剧场", "微塵劇場": "微尘剧场"
-  };
-  const requested = String(params.brand || "迷雾剧场");
-  const brand = aliases[requested] || requested;
-  return await loadTheaterLive(brand, params);
+  const url = "https://raw.githubusercontent.com/qiguo093/-/main/data/theater-data.json";
+  try {
+    const response = await Widget.http.get(url);
+    const data = typeof response.data === "string" ? JSON.parse(response.data) : response.data;
+    const root = data && (data.data || data.result || data);
+    const aliases = {
+      "迷雾剧场": "迷雾剧场", "迷霧劇場": "迷雾剧场",
+      "白夜剧场": "白夜剧场", "白夜劇場": "白夜剧场",
+      "X剧场": "X剧场", "X 劇場": "X剧场",
+      "玛卡巴卡的悬疑剧": "玛卡巴卡的悬疑剧", "瑪卡的片單": "玛卡巴卡的悬疑剧",
+      "横屏短剧": "横屏短剧", "橫屏短劇": "横屏短剧",
+      "生花剧场": "生花剧场", "生花劇場": "生花剧场",
+      "大家剧场": "大家剧场", "大家劇場": "大家剧场",
+      "小逗剧场": "小逗剧场", "小逗劇場": "小逗剧场",
+      "十分剧场": "十分剧场", "十分劇場": "十分剧场",
+      "板凳单元": "板凳单元", "板凳單元": "板凳单元",
+      "萤火单元": "萤火单元", "螢火單元": "萤火单元",
+      "正午阳光": "正午阳光", "正午陽光": "正午阳光",
+      "恋恋剧场": "恋恋剧场", "戀戀劇場": "恋恋剧场",
+      "悬疑剧场": "悬疑剧场", "懸疑劇場": "悬疑剧场",
+      "微尘剧场": "微尘剧场", "微塵劇場": "微尘剧场"
+    };
+    const brand = aliases[String(params.brand || "迷雾剧场")] || String(params.brand || "迷雾剧场");
+    const group = root?.[brand];
+    if (!group) return [];
+    let list = params.status === "aired" ? (group.aired || []) : params.status === "upcoming" ? (group.upcoming || []) : [...(group.upcoming || []), ...(group.aired || [])];
+    return Utils.paginate(Utils.sortList(list, params.sort_type), params.page);
+  } catch (e) {
+    console.error(`[loadTheater] ${e.message || e}`);
+    return [];
+  }
 }
 
+/* 实时采集由 GitHub Actions 生成 data/theater-data.json，模块只读取该文件。 */
 const THEATER_DOUBAN_IDS = {
   "迷雾剧场": "128396349", "白夜剧场": "158539495", "X剧场": "155026800",
   "玛卡巴卡的悬疑剧": "160885987", "横屏短剧": "152299516", "生花剧场": "159069554",
