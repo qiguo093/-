@@ -312,27 +312,54 @@ async function loadTheater(params = {}) {
   };
   const requested = String(params.brand || "迷雾剧场");
   const brand = aliases[requested] || requested;
-  const brandData = root && root[brand];
-  let list = [];
-  if (brandData) {
-    if (params.status === "aired") list = brandData.aired || [];
-    else if (params.status === "upcoming") list = brandData.upcoming || [];
-    else list = [...(brandData.upcoming || []), ...(brandData.aired || [])];
-  }
+  return await loadTheaterLive(brand, params);
+}
+}
 
-  // theater-data.json 目前可能暂时只有空分组。使用豆瓣热榜作为兜底，
-  // 避免模块因远程剧场采集为空而直接显示“没有数据”。
-  if (list.length === 0) {
-    const fallback = await Utils.fetch("douban-hot.json");
-    const fallbackRoot = fallback && (fallback.data || fallback.result || fallback);
-    const fallbackList = fallbackRoot?.tv || [];
-    list = fallbackList.map(item => ({
-      ...item,
-      subTitle: `${brand} · 豆瓣热榜兜底`
+const THEATER_DOUBAN_IDS = {
+  "迷雾剧场": "128396349", "白夜剧场": "158539495", "X剧场": "155026800",
+  "玛卡巴卡的悬疑剧": "160885987", "横屏短剧": "152299516", "生花剧场": "159069554",
+  "大家剧场": "160644809", "小逗剧场": "146055365", "十分剧场": "147708618",
+  "板凳单元": "163392459", "萤火单元": "163549603", "正午阳光": "125370543",
+  "恋恋剧场": "156086548", "悬疑剧场": "128400108", "微尘剧场": "161658331"
+};
+
+async function loadTheaterLive(brand, params = {}) {
+  const listId = THEATER_DOUBAN_IDS[brand];
+  if (!listId) return [];
+  const page = Math.max(1, parseInt(params.page) || 1);
+  const start = (page - 1) * 25;
+  const url = `https://m.douban.com/doulist/${listId}/?start=${start}`;
+  try {
+    const response = await Widget.http.get(url, { headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" } });
+    const html = typeof response.data === "string" ? response.data : "";
+    if (!html) return [];
+    const $ = Widget.html.load(html);
+    const raw = [];
+    $("ul.doulist-items > li").each((_, el) => {
+      const node = $(el);
+      const title = node.find(".info .title").text().trim();
+      const meta = node.find(".info .meta").text().trim();
+      const year = (meta.match(/(19\\d{2}|20\\d{2})/) || [])[1] || "";
+      if (title) raw.push({ title, year });
+    });
+    if (!raw.length) return [];
+    const matched = await Promise.all(raw.map(async item => {
+      try {
+        const r = await Widget.tmdb.get("search/tv", { params: { query: item.title, language: "zh-CN", first_air_date_year: item.year || undefined } });
+        const hit = (r.results || []).find(x => x.poster_path && x.backdrop_path) || (r.results || [])[0];
+        if (!hit) return null;
+        return { id: hit.id, type: "tmdb", mediaType: "tv", title: hit.name || item.title, posterPath: hit.poster_path, backdropPath: hit.backdrop_path, releaseDate: hit.first_air_date || "", rating: hit.vote_average || 0, description: hit.overview || `${brand} 实时片单`, genreTitle: "剧集" };
+      } catch (_) { return null; }
     }));
+    let result = matched.filter(Boolean);
+    if (params.status === "upcoming") result = result.filter(x => x.releaseDate && x.releaseDate > new Date().toISOString().slice(0,10));
+    if (params.status === "aired") result = result.filter(x => !x.releaseDate || x.releaseDate <= new Date().toISOString().slice(0,10));
+    return Utils.paginate(Utils.sortList(result, params.sort_type), 1);
+  } catch (e) {
+    console.error(`[loadTheaterLive] ${brand}: ${e.message || e}`);
+    return [];
   }
-
-  return Utils.paginate(Utils.sortList(list, params.sort_type), params.page);
 }
 
 /**
