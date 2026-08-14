@@ -1,0 +1,23 @@
+name: Validate ForwardWidget
+on:
+  push:
+    paths:
+      - "widgets/**/*.js"
+      - ".github/workflows/validate-forwardwidget.yml"
+  pull_request:
+    paths:
+      - "widgets/**/*.js"
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check JavaScript syntax
+        run: |
+          for f in widgets/*.js; do
+            echo "Checking $f"
+            node --check "$f"
+          done
