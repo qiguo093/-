@@ -314,7 +314,6 @@ async function loadTheater(params = {}) {
   const brand = aliases[requested] || requested;
   return await loadTheaterLive(brand, params);
 }
-}
 
 const THEATER_DOUBAN_IDS = {
   "迷雾剧场": "128396349", "白夜剧场": "158539495", "X剧场": "155026800",
