@@ -1,5 +1,8 @@
 name: 🎭 Update Theaters Collection
 
+permissions:
+  contents: write
+
 on:
   schedule:
     # 每天北京时间早上 10:30 自动更新
