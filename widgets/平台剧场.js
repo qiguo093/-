@@ -313,12 +313,24 @@ async function loadTheater(params = {}) {
   const requested = String(params.brand || "迷雾剧场");
   const brand = aliases[requested] || requested;
   const brandData = root && root[brand];
-  if (!brandData) return [];
+  let list = [];
+  if (brandData) {
+    if (params.status === "aired") list = brandData.aired || [];
+    else if (params.status === "upcoming") list = brandData.upcoming || [];
+    else list = [...(brandData.upcoming || []), ...(brandData.aired || [])];
+  }
 
-  let list;
-  if (params.status === "aired") list = brandData.aired || [];
-  else if (params.status === "upcoming") list = brandData.upcoming || [];
-  else list = [...(brandData.upcoming || []), ...(brandData.aired || [])];
+  // theater-data.json 目前可能暂时只有空分组。使用豆瓣热榜作为兜底，
+  // 避免模块因远程剧场采集为空而直接显示“没有数据”。
+  if (list.length === 0) {
+    const fallback = await Utils.fetch("douban-hot.json");
+    const fallbackRoot = fallback && (fallback.data || fallback.result || fallback);
+    const fallbackList = fallbackRoot?.tv || [];
+    list = fallbackList.map(item => ({
+      ...item,
+      subTitle: `${brand} · 豆瓣热榜兜底`
+    }));
+  }
 
   return Utils.paginate(Utils.sortList(list, params.sort_type), params.page);
 }
